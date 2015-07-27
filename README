@@ -1,86 +1,70 @@
-Minimal FreeSWITCH configuration
-================================
+FreeSWITCH issue FS-7805
+========================
 
-This is a minimalistic FreeSWITCH configuration. It does not do anyting,
-yet it allows starting the FreeSWITCH daemon and connecting to its
-console with fs_cli.
 
-The purpose of this configuration is to provide a base for new projects,
-so that you don't have to clean up the vanilla configuration from
-unneeded features.
+Installing the test environment on Debian Jessie
+------------------------------------------------
 
-Tested on Debian with packages from [http://files.freeswitch.org],
-FreeSWITCH version 1.2.13 (it should work also with any other FreeSWITCH
-version).
+Prerequisite: Sevana AQuA software in /opt/sevana:
+  aqua-v (binary)
+  aqua-v.lic (license)
 
-Installing FreeSWITCH on Debian Wheezy
---------------------------------------
+```
+apt-get update && apt-get install -y curl git gdb
 
-apt-get update && apt-get install -y curl git
+cd /etc
+git clone https://github.com/ssinyagin-freeswitch-jira/FS-7805.git freeswitch
+
 
 cat >/etc/apt/sources.list.d/freeswitch.list <<EOT
-deb http://files.freeswitch.org/repo/deb/debian/ wheezy main
+deb http://files.freeswitch.org/repo/deb/debian-unstable/ jessie main
+deb http://files.freeswitch.org/repo/deb/debian/ jessie main
 EOT
 
-curl http://files.freeswitch.org/repo/deb/debian/freeswitch_archive_g0.pub \
-| apt-key add -
+wget -O - https://files.freeswitch.org/repo/deb/debian/key.gpg |apt-key add -
 
-apt-get update && apt-get install -y freeswitch-all 
-
-
+apt-get update && apt-get install -y freeswitch-all freeswitch-all-dbg 
+```
 
 
-Usage if you do everethyng as root:
------------------------------------
-cd /etc
-git clone https://github.com/voxserv/freeswitch_conf_minimal.git freeswitch
+Audio distortion test
+---------------------
 
+```
+bash /etc/freeswitch/scripts/run_distortion_test.bash | tee log
+```
 
+Under bare metal hardware, the output is constant value of 97.20.
 
-Usage if you work as multiple non-root users:
----------------------------------------------
-echo "umask 0007" >>~/.profile 
-umask 0007
-sudo adduser jsmith freeswitch
-sudo mkdir /etc/freeswitch
-sudo chgrp freeswitch /etc/freeswitch
-sudo chmod g+ws /etc/freeswitch
-cd /etc/freeswitch
-git init --shared=0660
-git pull https://github.com/voxserv/freeswitch_conf_minimal.git master
+Same results in a guest VM under Xen hypervisor version 4.4.2-rc1 (linode.com)
+
+In a VmWare VM (arubacloud.com) and in KVM VM (digitalocean.com), the
+score is fluctuating, and if it goes below 90, the produced audio has a
+strong distortion starting somewhere in the middle and contibuing till
+the end of the recording.
 
 
 
+Conference dialer test
+----------------------
+
+Launch valgrind and the dialer in two different terminal windows:
+
+```
+valgrind --tool=memcheck --log-file=vg.log \
+  --leak-check=full --leak-resolution=high \
+  --show-reachable=yes /usr/bin/freeswitch -vg \
+  -nonat -u freeswitch -g freeswitch
+```
+
+```
+sh /etc/freeswitch/scripts/dial_conf.sh
+```
+
+After the test is finished, issue "shutdown" command to FreeSWITCH.
 
 
-Further on, you may want to set up your own project-specific Git
-repository and push new changes to it.
 
-The following files are empty and are placed there to keep the XML
-preprocessor happy. Feel free to delete them after placing your own XML
-files:
-
-directory/stub.xml
-ivr_menus/stub.xml
-lang/en/ivr/stub.xml
-sip_profiles/external/stub.xml
-sip_profiles/internal/stub.xml
-
-
-The SIP profiles are modified to allow multiple domains, as described in
-http://wiki.freeswitch.org/wiki/Multi-tenant
-
-sip_profiles/internal.xml
-is modified not to alias with any domain in the directory
-
-autoload_configs/local_stream.conf.xml
-is modified to match the MOH paths in Debian packages
-
-autoload_configs/logfile.conf.xml
-logfile rotation is enabled, debug loglevel is disabled
-
-
-See also: tutorials in docs/ subfolder
 
 
 Author
